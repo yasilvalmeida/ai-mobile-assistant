@@ -1,0 +1,284 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  firstName      String
+  lastName       String
+  password       String
+  role           UserRole @default(FIELD_AGENT)
+  organizationId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  reports      FieldReport[]
+  locations    GPSLocation[]
+  ocrResults   OCRResult[]
+  aiRequests   AIRequest[]
+  aiResponses  AIResponse[]
+  routeHistory RouteHistory[]
+
+  @@map("users")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("organizations")
+}
+
+model FieldReport {
+  id          String         @id @default(cuid())
+  title       String
+  description String
+  status      ReportStatus   @default(DRAFT)
+  priority    Priority       @default(MEDIUM)
+  category    ReportCategory
+  aiSummary   String?
+  aiSuggestions Json         @default("[]")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  syncedAt    DateTime?
+
+  // Foreign Keys
+  userId     String
+  locationId String
+
+  // Relations
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location    GPSLocation   @relation(fields: [locationId], references: [id])
+  attachments Attachment[]
+  ocrResults  OCRResult[]
+
+  @@map("field_reports")
+}
+
+model GPSLocation {
+  id        String   @id @default(cuid())
+  latitude  Float
+  longitude Float
+  altitude  Float?
+  accuracy  Float
+  address   String?
+  notes     String?
+  timestamp DateTime @default(now())
+
+  // Foreign Keys
+  userId String
+
+  // Relations
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports        FieldReport[]
+  routeStart     RouteHistory[] @relation("RouteStart")
+  routeEnd       RouteHistory[] @relation("RouteEnd")
+  routeWaypoints RouteWaypoint[]
+
+  @@map("gps_locations")
+}
+
+model RouteHistory {
+  id            String   @id @default(cuid())
+  totalDistance Float
+  totalDuration Float
+  startTime     DateTime
+  endTime       DateTime
+  createdAt     DateTime @default(now())
+
+  // Foreign Keys
+  userId          String
+  startLocationId String
+  endLocationId   String
+
+  // Relations
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startLocation GPSLocation       @relation("RouteStart", fields: [startLocationId], references: [id])
+  endLocation   GPSLocation       @relation("RouteEnd", fields: [endLocationId], references: [id])
+  waypoints     RouteWaypoint[]
+
+  @@map("route_history")
+}
+
+model RouteWaypoint {
+  id       String @id @default(cuid())
+  sequence Int
+
+  // Foreign Keys
+  routeId    String
+  locationId String
+
+  // Relations
+  route    RouteHistory @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  location GPSLocation  @relation(fields: [locationId], references: [id])
+
+  @@map("route_waypoints")
+}
+
+model OCRResult {
+  id              String       @id @default(cuid())
+  text            String
+  confidence      Float
+  boundingBoxes   Json
+  documentType    DocumentType
+  extractedFields Json         @default("{}")
+  imageUri        String
+  timestamp       DateTime     @default(now())
+
+  // Foreign Keys
+  userId   String
+  reportId String?
+
+  // Relations
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report FieldReport? @relation(fields: [reportId], references: [id])
+
+  @@map("ocr_results")
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  fileName   String
+  filePath   String
+  fileSize   Int
+  mimeType   String
+  uploadedAt DateTime @default(now())
+
+  // Foreign Keys
+  reportId String
+
+  // Relations
+  report FieldReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+model AIRequest {
+  id        String        @id @default(cuid())
+  prompt    String
+  context   String?
+  type      AIRequestType
+  timestamp DateTime      @default(now())
+
+  // Foreign Keys
+  userId   String
+  reportId String?
+
+  // Relations
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  responses AIResponse[]
+
+  @@map("ai_requests")
+}
+
+model AIResponse {
+  id             String   @id @default(cuid())
+  response       String
+  confidence     Float
+  tokensUsed     Int
+  processingTime Int
+  timestamp      DateTime @default(now())
+
+  // Foreign Keys
+  requestId String
+  userId    String
+
+  // Relations
+  request AIRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_responses")
+}
+
+model SyncLog {
+  id        String           @id @default(cuid())
+  entityId  String
+  entityType String
+  operation SyncOperation
+  status    SyncStatus       @default(PENDING)
+  error     String?
+  retryCount Int              @default(0)
+  createdAt DateTime         @default(now())
+  syncedAt  DateTime?
+
+  // Foreign Keys
+  userId String
+
+  @@map("sync_logs")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  FIELD_AGENT
+  SUPERVISOR
+  VIEWER
+}
+
+enum ReportStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  REVIEWED
+  ARCHIVED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ReportCategory {
+  INSPECTION
+  LOGISTICS
+  SALES
+  SURVEY
+  MAINTENANCE
+  INCIDENT
+  OTHER
+}
+
+enum DocumentType {
+  INVOICE
+  RECEIPT
+  ID_CARD
+  BUSINESS_CARD
+  LICENSE_PLATE
+  FORM
+  OTHER
+}
+
+enum AIRequestType {
+  SUMMARIZE
+  SUGGEST
+  QUESTION
+  EXTRACT
+  TRANSLATE
+}
+
+enum SyncOperation {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum SyncStatus {
+  PENDING
+  SUCCESS
+  FAILED
+} 
