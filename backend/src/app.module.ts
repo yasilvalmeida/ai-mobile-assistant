@@ -6,6 +6,9 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 
 import { AuthModule } from './auth/auth.module';
+import { ReportsModule } from './reports/reports.module';
+import { LocationsModule } from './locations/locations.module';
+import { AIModule } from './ai/ai.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -42,6 +45,9 @@ import { AppController } from './app.controller';
 
     // Feature modules
     AuthModule,
+    ReportsModule,
+    LocationsModule,
+    AIModule,
   ],
   controllers: [AppController],
 })

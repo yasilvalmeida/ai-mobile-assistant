@@ -97,6 +97,12 @@ export const theme = {
     onWarning: '#FFFFFF',
     warningContainer: '#FFF8E1',
     onWarningContainer: '#E65100',
+
+    // Info colors (custom)
+    info: '#2196F3',
+    onInfo: '#FFFFFF',
+    infoContainer: '#E3F2FD',
+    onInfoContainer: '#0D47A1',
     
     // Surface colors
     surface: '#FFFFFF',
